@@ -16,12 +16,15 @@ private:
     String statusMessage = "";
     String currentVersion = FIRMWARE_VERSION;
     String latestVersion = "";
+    String latestReleaseUrl = "";
+    bool updateAvailable = false;
     
 public:
     void init();
     void loop();
     bool checkForUpdate();
     bool performUpdate(String firmwareUrl);
+    bool installLatestRelease();
     void enableWebOTA();
     
     // Status getters
@@ -29,6 +32,7 @@ public:
     String getStatusMessage() { return statusMessage; }
     String getCurrentVersion() { return currentVersion; }
     String getLatestVersion() { return latestVersion; }
+    bool isUpdateAvailable() { return updateAvailable; }
     
     // Manual update trigger
     void triggerUpdateCheck() { lastUpdateCheck = 0; }

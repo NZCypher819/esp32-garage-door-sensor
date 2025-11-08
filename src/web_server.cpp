@@ -6,6 +6,12 @@
 // Include missing extern declaration
 extern SensorData currentSensorData;
 
+// Forward declarations
+String getMainPageHTML();
+String getCSS();
+String getJavaScript();
+String getUpdatePageHTML();
+
 #ifdef ENABLE_WIFI
 #include <ArduinoJson.h>
 #include <WebServer.h>
@@ -57,8 +63,46 @@ void initWebServer() {
         server.send(200, "application/json", "{\"status\":\"checking\"}");
     });
 
+    server.on("/api/ota/install", HTTP_POST, []() {
+        bool success = otaManager.installLatestRelease();
+        if (success) {
+            server.send(200, "application/json", "{\"status\":\"installing\",\"message\":\"Update started, device will restart\"}");
+        } else {
+            server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"No update available or installation failed\"}");
+        }
+    });
+
     server.on("/api/ota/info", HTTP_GET, []() {
         server.send(200, "application/json", getOTAInfoJSON());
+    });
+
+    // Web-based firmware upload page
+    server.on("/update", HTTP_GET, []() {
+        server.send(200, "text/html", getUpdatePageHTML());
+    });
+
+    // Handle firmware upload
+    server.on("/update", HTTP_POST, []() {
+        server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+        ESP.restart();
+    }, []() {
+        HTTPUpload& upload = server.upload();
+        if (upload.status == UPLOAD_FILE_START) {
+            Serial.printf("Update Start: %s\n", upload.filename.c_str());
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+                Update.printError(Serial);
+            }
+        } else if (upload.status == UPLOAD_FILE_WRITE) {
+            if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+                Update.printError(Serial);
+            }
+        } else if (upload.status == UPLOAD_FILE_END) {
+            if (Update.end(true)) {
+                Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+            } else {
+                Update.printError(Serial);
+            }
+        }
     });
 
     // CSS styles
@@ -187,6 +231,7 @@ String getOTAInfoJSON() {
     doc["firmware_name"] = FIRMWARE_NAME;
     doc["update_url"] = OTA_UPDATE_URL;
     doc["web_update_url"] = "/update";
+    doc["update_available"] = otaManager.isUpdateAvailable();
     
     String jsonString;
     serializeJson(doc, jsonString);
@@ -251,6 +296,7 @@ String getMainPageHTML() {
                 </div>
                 <div class="ota-controls">
                     <button id="check-update">Check for Update</button>
+                    <button id="install-update" style="display: none;">Install Update</button>
                     <button id="web-update">Web Update</button>
                 </div>
             </div>
@@ -434,6 +480,23 @@ button:hover {
     transform: translateY(-1px);
 }
 
+#install-update {
+    background: #38a169;
+    color: white;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+}
+
+#install-update:hover {
+    background: #2f855a;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(56, 161, 105, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(56, 161, 105, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(56, 161, 105, 0); }
+}
+
 #logs-container {
     max-height: 300px;
     overflow-y: auto;
@@ -513,6 +576,10 @@ class GarageDoorMonitor {
 
         document.getElementById('check-update').addEventListener('click', () => {
             this.checkForUpdate();
+        });
+
+        document.getElementById('install-update').addEventListener('click', () => {
+            this.installUpdate();
         });
 
         document.getElementById('web-update').addEventListener('click', () => {
@@ -702,6 +769,15 @@ class GarageDoorMonitor {
                 const data = await response.json();
                 document.getElementById('ota-current-version').textContent = data.current_version || '--';
                 document.getElementById('ota-latest-version').textContent = data.latest_version || '--';
+                
+                // Show/hide install button based on update availability
+                const installButton = document.getElementById('install-update');
+                if (data.update_available) {
+                    installButton.style.display = 'inline-block';
+                    installButton.textContent = `Install ${data.latest_version}`;
+                } else {
+                    installButton.style.display = 'none';
+                }
             }
         } catch (error) {
             console.error('Failed to load OTA info:', error);
@@ -748,6 +824,41 @@ class GarageDoorMonitor {
             console.error('Failed to check for update:', error);
         }
     }
+
+    async installUpdate() {
+        if (!confirm('This will install the latest firmware from GitHub and restart the device. Continue?')) {
+            return;
+        }
+
+        try {
+            const button = document.getElementById('install-update');
+            button.disabled = true;
+            button.textContent = 'Installing...';
+            
+            const response = await fetch('/api/ota/install', { method: 'POST' });
+            if (response.ok) {
+                const result = await response.json();
+                if (result.status === 'installing') {
+                    button.textContent = 'Installing... Device will restart';
+                    alert('Update started! The device will restart automatically. Please refresh this page in about 30 seconds.');
+                } else {
+                    alert('Installation failed: ' + (result.message || 'Unknown error'));
+                    button.disabled = false;
+                    button.textContent = 'Install Update';
+                }
+            } else {
+                alert('Failed to start installation. Please try again.');
+                button.disabled = false;
+                button.textContent = 'Install Update';
+            }
+        } catch (error) {
+            console.error('Failed to install update:', error);
+            alert('Installation failed. Please try again.');
+            const button = document.getElementById('install-update');
+            button.disabled = false;
+            button.textContent = 'Install Update';
+        }
+    }
 }
 
 // Initialize the monitor when page loads
@@ -755,6 +866,66 @@ document.addEventListener('DOMContentLoaded', () => {
     new GarageDoorMonitor();
 });
     )";
+}
+
+String getUpdatePageHTML() {
+    return R"HTML(
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ESP32 Firmware Update</title>
+    <style>
+        body { font-family: Arial; margin: 40px; background: #f0f0f0; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .upload-form { margin: 20px 0; }
+        input[type="file"] { width: 100%; padding: 10px; margin: 10px 0; border: 2px dashed #ccc; border-radius: 5px; }
+        input[type="submit"] { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        input[type="submit"]:hover { background: #45a049; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .back-link { text-align: center; margin: 20px 0; }
+        .back-link a { color: #007bff; text-decoration: none; }
+        .back-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Firmware Update</h1>
+        
+        <div class="info">
+            <strong>Instructions:</strong><br>
+            1. Select a .bin firmware file below<br>
+            2. Click Update Firmware to begin upload<br>
+            3. Wait for the update to complete (do not close this page)<br>
+            4. The ESP32 will restart automatically when done
+        </div>
+        
+        <div class="warning">
+            <strong>Warning:</strong> Do not power off the device during update! This could brick your ESP32.
+        </div>
+        
+        <form method="POST" action="/update" enctype="multipart/form-data" class="upload-form">
+            <input type="file" name="update" accept=".bin" required>
+            <input type="submit" value="Update Firmware" onclick="return confirm('Are you sure you want to update the firmware? The device will restart.')">
+        </form>
+        
+        <div class="back-link">
+            <a href="/">Back to Main Dashboard</a>
+        </div>
+    </div>
+    
+    <script>
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function() {
+            const submit = document.querySelector('input[type="submit"]');
+            submit.value = 'Uploading... Please wait';
+            submit.disabled = true;
+        });
+    </script>
+</body>
+</html>
+    )HTML";
 }
 
 #else

@@ -236,6 +236,11 @@ bool OTAManager::checkForUpdate() {
                         Serial.println(downloadUrl);
                         Serial.println("****************************************");
                         
+                        // Store release info for web install button
+                        latestReleaseUrl = downloadUrl;
+                        updateAvailable = true;
+                        statusMessage = "Update available: " + latestVersion + " (Click to install)";
+                        
                         // Auto-update can be enabled here
                         // performUpdate(downloadUrl);
                         
@@ -249,6 +254,8 @@ bool OTAManager::checkForUpdate() {
                 statusMessage = "No firmware binary found in release";
             } else {
                 statusMessage = "Firmware up to date";
+                updateAvailable = false;
+                latestReleaseUrl = "";
                 Serial.println("========================================");
                 Serial.println("    Firmware is UP TO DATE");
                 Serial.println("========================================");
@@ -346,4 +353,26 @@ bool OTAManager::performUpdate(String firmwareUrl) {
     currentStatus = OTA_UPDATE_ERROR;
     http.end();
     return false;
+}
+
+bool OTAManager::installLatestRelease() {
+    if (!updateAvailable || latestReleaseUrl.isEmpty()) {
+        Serial.println("No update available to install");
+        log_w("Install requested but no update available");
+        return false;
+    }
+    
+    Serial.println("========================================");
+    Serial.println("   INSTALLING LATEST GITHUB RELEASE");
+    Serial.println("========================================");
+    Serial.print("Installing: ");
+    Serial.println(latestVersion);
+    Serial.print("From URL: ");
+    Serial.println(latestReleaseUrl);
+    
+    log_i("Installing latest release: %s", latestVersion.c_str());
+    log_i("Download URL: %s", latestReleaseUrl.c_str());
+    
+    // Use existing performUpdate method
+    return performUpdate(latestReleaseUrl);
 }
