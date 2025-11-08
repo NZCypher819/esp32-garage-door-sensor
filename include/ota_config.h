@@ -10,7 +10,7 @@
 #define FIRMWARE_VERSION "1.0.0"
 #define FIRMWARE_NAME "ESP32-GarageDoor"
 
-// OTA Update URLs (will be configured for GitHub releases)
+// OTA Update URLs (GitHub releases API)
 #define OTA_UPDATE_URL "https://api.github.com/repos/NZCypher819/esp32-garage-door-sensor/releases/latest"
 #define OTA_CHECK_INTERVAL 60000  // Check for updates every 60 seconds in development
 

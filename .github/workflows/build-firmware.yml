@@ -1,0 +1,158 @@
+name: Build ESP32 Firmware
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Cache PlatformIO dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.platformio/.cache
+          ~/.platformio/packages
+          ~/.platformio/platforms
+        key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}
+        restore-keys: |
+          ${{ runner.os }}-pio-
+          
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+        
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio
+        
+    - name: Create secrets.h from template
+      run: |
+        cp include/secrets.h.template include/secrets.h
+        # For CI builds, use dummy credentials (device won't connect but will compile)
+        sed -i 's/YOUR_WIFI_SSID_HERE/CI_BUILD_SSID/' include/secrets.h
+        sed -i 's/YOUR_WIFI_PASSWORD_HERE/CI_BUILD_PASSWORD/' include/secrets.h
+        
+    - name: Build firmware
+      run: |
+        platformio run --environment esp32-s3-devkitc-1
+        
+    - name: Prepare firmware artifacts
+      run: |
+        mkdir -p firmware-release
+        cp .pio/build/esp32-s3-devkitc-1/firmware.bin firmware-release/
+        cp .pio/build/esp32-s3-devkitc-1/firmware.elf firmware-release/
+        
+        # Create firmware info file
+        cat > firmware-release/firmware-info.json << EOF
+        {
+          "version": "${{ github.ref_name || 'dev-build' }}",
+          "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "commit": "${{ github.sha }}",
+          "target": "esp32-s3-devkitc-1",
+          "features": [
+            "E3JK-RR11 photoelectric sensor",
+            "WiFi connectivity",
+            "Web dashboard",
+            "OTA updates",
+            "Simulation mode"
+          ]
+        }
+        EOF
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: esp32-firmware-${{ github.sha }}
+        path: firmware-release/
+        retention-days: 30
+        
+    # Only run on releases
+    - name: Attach firmware to release
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: firmware-release/firmware.bin
+        asset_name: esp32-garage-door-firmware-${{ github.event.release.tag_name }}.bin
+        asset_content_type: application/octet-stream
+        
+    - name: Attach firmware info to release
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: firmware-release/firmware-info.json
+        asset_name: firmware-info.json
+        asset_content_type: application/json
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run security scan
+      run: |
+        echo "🔍 Security Scan Results:" > security-report.txt
+        echo "=========================" >> security-report.txt
+        echo "" >> security-report.txt
+        
+        # Check for hardcoded credentials
+        echo "Checking for hardcoded credentials..." >> security-report.txt
+        if grep -r "password.*=.*['\"].*['\"]" src/ include/ --exclude="*.template" || true; then
+          echo "⚠️  Found potential hardcoded passwords" >> security-report.txt
+        else
+          echo "✅ No hardcoded passwords found" >> security-report.txt
+        fi
+        
+        # Check WiFi credential handling
+        echo "" >> security-report.txt
+        echo "WiFi Security:" >> security-report.txt
+        if [ -f "include/secrets.h" ] && ! grep -q "template" include/secrets.h; then
+          echo "⚠️  Real secrets.h detected (should be gitignored)" >> security-report.txt
+        else
+          echo "✅ Using template secrets.h for CI" >> security-report.txt
+        fi
+        
+        # Check OTA security
+        echo "" >> security-report.txt
+        echo "OTA Security:" >> security-report.txt
+        if grep -q "OTA_PASSWORD" include/ota_config.h; then
+          echo "✅ OTA password protection enabled" >> security-report.txt
+        else
+          echo "⚠️  OTA password not found" >> security-report.txt
+        fi
+        
+        cat security-report.txt
+        
+    - name: Upload security report
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-report-${{ github.sha }}
+        path: security-report.txt

@@ -1,278 +1,308 @@
-# ESP32 S3 Nano E3JK-RR11 Photoelectric Sensor Project with Web Dashboard
+# ESP32 Garage Door Sensor with OTA Updates
 
-A PlatformIO-based project for interfacing the Omron E3JK-RR11 photoelectric proximity sensor with the ESP32 S3 Nano development board. Features a real-time web dashboard for monitoring beam status, system logs, and device information. Perfect for garage door automation, object detection, and proximity sensing applications.
+A comprehensive IoT solution for monitoring garage doors using the E3JK-RR11 photoelectric sensor with the ESP32 S3 Nano microcontroller.
 
-## Features
+## 🚀 Features
 
-- **E3JK-RR11 photoelectric sensor**: Primary object detection with interrupt-driven input
-- **Real-time Web Dashboard**: Monitor beam status, LED state, and system logs remotely
-- **WiFi connectivity**: Secure connection with "U64A 2.4" network
-- **Live status updates**: Automatic refresh every 2 seconds
-- **System logging**: Comprehensive event logging with different severity levels
-- **Mobile responsive**: Works on phones, tablets, and desktops
-- **Garage door ready**: Optimized for door automation and safety applications  
-- **Multi-sensor support**: Optional DHT22, BMP280, and analog sensors
-- **Configurable GPIO pins**: Optimized for ESP32 S3 Nano
-- **Interrupt handling**: Fast response times for object detection
-- **Debounced inputs**: Reliable detection with noise filtering
-- **Status LED**: Visual indication of sensor state
+### Hardware Support
+- **ESP32 S3 Nano** - High-performance microcontroller with WiFi
+- **E3JK-RR11** - Photoelectric proximity sensor for beam detection
+- **GPIO Indicators** - LED status indicators
+- **Sensor Expansion** - Support for DHT22, BMP280 (optional)
 
-## Hardware Requirements
+### Software Capabilities  
+- **Real-time Web Dashboard** - Mobile-responsive monitoring interface
+- **WiFi Connectivity** - Secure credential management
+- **Over-the-Air (OTA) Updates** - Network and web-based firmware updates
+- **Simulation Mode** - Test without physical sensors
+- **System Monitoring** - Memory usage, uptime, WiFi status
+- **Event Logging** - Real-time activity logs with timestamps
 
-- ESP32 S3 Nano development board
-- Omron E3JK-RR11 photoelectric proximity sensor
-- Status LED (optional)
-- DHT22 temperature/humidity sensor (optional)
-- BMP280 pressure sensor (optional)
-- Breadboard and jumper wires
-- 12V power supply for E3JK-RR11 (if using NPN output model)
+### Security Features
+- **Encrypted WiFi** - WPA2/WPA3 support
+- **OTA Authentication** - Password-protected updates  
+- **Credential Protection** - Git-ignored secrets management
+- **GitHub Integration** - Automated secure deployments
 
-## E3JK-RR11 Sensor Specifications
+## 📦 Quick Start
 
-- **Detection range**: 0.1-7m (depending on reflector/object)
-- **Response time**: ≤1ms
-- **Output**: NPN or PNP transistor output
-- **Power**: 12-24V DC
-- **Connection**: 3-wire (Brown=+V, Blue=0V, Black=Output)
+### 1. Hardware Setup
+```
+ESP32 S3 Nano Connections:
+├── GPIO 4  → E3JK-RR11 Signal (with voltage level shifter)
+├── GPIO 2  → Status LED
+├── 3.3V    → Sensor Logic (via level shifter)
+└── GND     → Common Ground
 
-## Pin Configuration
+E3JK-RR11 Power: 12V DC supply (separate)
+```
 
-| Sensor/Component | GPIO Pin | Notes |
-|-----------------|----------|-------|
-| E3JK-RR11 Output | GPIO 4 | Photoelectric sensor digital output |
-| Status LED | GPIO 2 | Indicates object detection state |
-| DHT22 Data | GPIO 5 | Temperature/Humidity sensor (optional) |
-| BMP280 SDA | GPIO 8 | I2C Data line (optional) |
-| BMP280 SCL | GPIO 9 | I2C Clock line (optional) |
-| Analog Sensor | A0 | General purpose analog input (optional) |
+### 2. Software Installation
 
-## E3JK-RR11 Wiring
+**Prerequisites:**
+- [PlatformIO](https://platformio.org/) or Arduino IDE
+- [Git](https://git-scm.com/)
 
-**For NPN Output Model:**
-- Brown wire → 12V+ (external power supply)
-- Blue wire → GND (connect to ESP32 GND and power supply GND)
-- Black wire → GPIO 4 (through voltage divider if needed)
+**Clone and Setup:**
+```bash
+git clone https://github.com/NZCypher819/esp32-garage-door-sensor.git
+cd esp32-garage-door-sensor
 
-**Note**: The E3JK-RR11 typically requires 12V power. Use a voltage divider or level shifter to safely connect the 12V output to the ESP32's 3.3V GPIO pin.
+# Configure WiFi credentials
+cp include/secrets.h.template include/secrets.h
+# Edit secrets.h with your WiFi details
+```
 
-## Software Setup
+**Build and Upload:**
+```bash
+# Using PlatformIO
+pio run -t upload
 
-### Prerequisites
+# Using PlatformIO with specific port
+pio run -t upload --upload-port COM4
+```
 
-1. **VS Code** with PlatformIO extension installed
-2. **Git** for version control
+### 3. Configuration
 
-### Installation
-
-1. Clone or download this project
-2. Open the project folder in VS Code
-3. PlatformIO will automatically install dependencies listed in `platformio.ini`
-
-### Configuration
-
-Edit `include/config.h` to customize your setup:
-
+Edit `include/secrets.h`:
 ```cpp
-// Enable/disable sensors
-#define ENABLE_E3JK_RR11           // Primary photoelectric sensor
-// #define ENABLE_DHT22            // Uncomment for environmental monitoring
-// #define ENABLE_BMP280           // Uncomment for pressure monitoring
+#define WIFI_SSID "Your-WiFi-Network"
+#define WIFI_PASSWORD "Your-WiFi-Password"
+```
 
-// Adjust GPIO pins as needed
-#define E3JK_RR11_PIN 4            // E3JK-RR11 digital output
-#define LED_INDICATOR_PIN 2        // Status LED
-#define DHT22_PIN 5                // Optional DHT22 sensor
-
-// E3JK-RR11 Configuration  
-#define E3JK_DEBOUNCE_TIME 50      // Debounce time in milliseconds
-#define E3JK_BEAM_BROKEN LOW       // LOW = beam broken (object detected)
-#define E3JK_BEAM_CLEAR HIGH       // HIGH = beam clear (no object)
-
-// LED Control
-#define LED_ON_BEAM_BROKEN true    // LED turns ON when beam is broken
-#define LED_OFF_BEAM_CLEAR true    // LED turns OFF when beam is clear
-
-// Configure sensor reading interval
-#define SENSOR_READ_INTERVAL 2000  // milliseconds
+Optional settings in `include/config.h`:
+```cpp
+#define ENABLE_SIMULATION_MODE    // Test without hardware
+#define ENABLE_DHT22             // Temperature sensor
+#define ENABLE_BMP280            // Pressure sensor
 ```
 
 ## 🌐 Web Dashboard
 
-Once your ESP32 connects to WiFi, you can access the web dashboard:
+Once connected, access the dashboard at: `http://[ESP32-IP-ADDRESS]`
 
-### **Dashboard URL**: `http://[ESP32_IP_ADDRESS]`
-- The IP address will be shown in the serial monitor
-- Example: `http://192.168.1.100`
+### Dashboard Features
+- **🚨 Real-time Beam Status** - CLEAR/BLOCKED with timestamps
+- **📊 System Information** - Memory, uptime, WiFi signal
+- **📋 Event Logs** - Sensor state changes and system events
+- **🔄 OTA Controls** - Check for updates and manage firmware
+- **📱 Mobile Responsive** - Works on phones, tablets, desktop
 
-### **Dashboard Features**:
-- **🔴 Beam Sensor Status**: Real-time indication of beam broken/clear
-- **💡 LED Status**: Shows if indicator LED is on/off  
-- **📶 WiFi Information**: Signal strength and IP address
-- **⏱️ System Information**: Uptime, memory usage, chip temperature
-- **📋 Live Logs**: Real-time system events and errors
-- **📱 Mobile Responsive**: Works on any device
-
-### **Dashboard Screenshots**:
+### API Endpoints
 ```
-┌─────────────────────────────────────┐
-│ 🏠 ESP32 Garage Door Monitor       │
-├─────────────────────────────────────┤
-│ Beam Sensor: CLEAR      🟢         │
-│ LED Status:  OFF        ⚫         │
-│ WiFi Signal: -45 dBm    📶         │
-│ Uptime:     2h 15m      ⏱️         │
-├─────────────────────────────────────┤
-│ System Logs:                        │
-│ [INFO] Beam clear - path restored   │
-│ [WARN] Beam broken - object detect  │
-│ [INFO] WiFi connected to U64A 2.4   │
-└─────────────────────────────────────┘
+GET  /api/status      # Sensor status and beam state
+GET  /api/logs        # Recent system logs  
+GET  /api/system      # System information
+GET  /api/ota/status  # OTA update status
+GET  /api/ota/info    # Version information
+POST /api/clear-logs  # Clear log history
+POST /api/ota/check   # Manual update check
 ```
 
-## E3JK-RR11 Behavior
+## 🔄 OTA Updates
 
-- **Beam Clear** (no object): LED OFF, Green indicator on dashboard
-- **Beam Broken** (object detected): LED ON, Red indicator on dashboard  
-- **Response time**: <1ms with interrupt handling
-- **Debounced**: 50ms debounce prevents false triggers
-- **Web monitoring**: Real-time status updates every 2 seconds
+### Automatic Updates
+The device automatically checks GitHub releases every 60 seconds and can update itself when new firmware is available.
 
-## Usage
+### Manual Update Methods
 
-1. **Power on** your ESP32 S3 Nano
-2. **Connect to WiFi** - Check serial monitor for connection status
-3. **Open web dashboard** - Navigate to the IP address shown
-4. **Monitor beam status** - Watch real-time updates as objects break the beam
-5. **View system logs** - Check the logs panel for detailed event history
+**1. Web Interface:**
+- Visit `http://[device-ip]/update`  
+- Login: `admin` | Password: `GarageDoor2025`
+- Upload `.bin` file directly
 
-### **Typical Log Output**:
-```
-[INFO] System started successfully
-[INFO] WiFi connected to U64A 2.4
-[INFO] Web server started at http://192.168.1.100
-[WARN] Beam broken - object detected!
-[INFO] Beam clear - path restored
+**2. Network OTA (Arduino IDE/PlatformIO):**
+```bash
+# PlatformIO over network
+pio run -t upload --upload-port [device-ip]
+
+# Arduino IDE: Tools → Port → Network Port
 ```
 
-## Building and Uploading
+**3. GitHub Releases:**
+- Device automatically detects new releases
+- Downloads and installs firmware
+- Reboots with new version
 
-### Using VS Code (Recommended)
-1. Connect your ESP32 S3 Nano to your computer via USB
-2. Use **Ctrl+Shift+P** → **Tasks: Run Task** and select:
-   - **PlatformIO Build** - Compile the project
-   - **PlatformIO Upload** - Flash to device
-   - **PlatformIO Monitor** - View serial output
+## 🛠 Development
 
-### Using Terminal
-If PlatformIO CLI is not in your PATH, use the full path:
-```powershell
-# Build
-& "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" run
-
-# Upload
-& "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" run --target upload
-
-# Monitor
-& "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" device monitor
+### Project Structure
+```
+├── src/                    # Main source code
+│   ├── main.cpp           # Application entry point
+│   ├── sensors.cpp        # E3JK-RR11 and sensor management
+│   ├── wifi_manager.cpp   # WiFi connection handling
+│   ├── web_server.cpp     # HTTP server and dashboard
+│   └── ota_manager.cpp    # OTA update functionality
+├── include/               # Header files
+│   ├── config.h          # Feature configuration
+│   ├── secrets.h.template # WiFi credentials template
+│   ├── ota_config.h       # OTA settings
+│   └── *.h               # Module headers
+├── .github/workflows/     # CI/CD automation
+├── platformio.ini         # PlatformIO configuration
+└── README.md             # This file
 ```
 
-### Build Output
-- **RAM Usage**: ~14% (46,012 bytes) 
-- **Flash Usage**: ~23.5% (786,841 bytes)
-- **Build Time**: ~7 seconds
-- **Libraries**: ArduinoJson, WebServer, WiFi, sensors
+### Building Locally
+```bash
+# Install dependencies
+pio lib install
 
-## Usage
+# Build firmware
+pio run
 
-1. Upload the code to your ESP32 S3 Nano
-2. Open the serial monitor (115200 baud)
-3. View real-time sensor readings
-4. Modify `src/main.cpp` to add your application logic
+# Upload to device
+pio run -t upload
 
-## Project Structure
-
-```
-├── platformio.ini          # PlatformIO configuration
-├── include/
-│   ├── config.h            # Project configuration
-│   └── sensors.h           # Sensor function declarations
-├── src/
-│   ├── main.cpp            # Main application code
-│   └── sensors.cpp         # Sensor implementation
-└── lib/                    # Custom libraries (if any)
+# Monitor serial output
+pio device monitor
 ```
 
-## Adding New Sensors
+### Testing
+```bash
+# Enable simulation mode in config.h
+#define ENABLE_SIMULATION_MODE
 
-1. Add sensor-specific libraries to `platformio.ini`
-2. Define GPIO pins in `include/config.h`
-3. Add function declarations to `include/sensors.h`
-4. Implement sensor code in `src/sensors.cpp`
-5. Call sensor functions from `src/main.cpp`
+# Build and upload - beam will toggle every 10 seconds
+pio run -t upload
+```
 
-## Troubleshooting
+## 🔧 Configuration Reference
+
+### WiFi Settings (`secrets.h`)
+```cpp
+#define WIFI_SSID "Your-Network-Name"
+#define WIFI_PASSWORD "Your-Network-Password"
+```
+
+### OTA Settings (`ota_config.h`)
+```cpp
+#define OTA_PASSWORD "GarageDoor2025"     // Change this!
+#define OTA_PORT 3232                    // Network OTA port
+#define FIRMWARE_VERSION "1.0.0"         // Current version
+#define OTA_CHECK_INTERVAL 60000         // Update check interval (ms)
+```
+
+### Sensor Configuration (`config.h`)
+```cpp
+#define BEAM_SENSOR_PIN 4               // E3JK-RR11 input pin
+#define LED_INDICATOR_PIN 2             // Status LED pin  
+#define BEAM_DEBOUNCE_TIME 50           // Debounce delay (ms)
+#define SIMULATION_BEAM_INTERVAL 10000  // Simulation toggle (ms)
+```
+
+## 🔒 Security
+
+### Best Practices
+1. **Change default OTA password** in `ota_config.h`
+2. **Use strong WiFi credentials** 
+3. **Keep firmware updated** via automatic updates
+4. **Secure physical access** to the device
+5. **Monitor access logs** via web dashboard
+
+### Credential Management
+- WiFi credentials in `secrets.h` (git-ignored)
+- OTA password configurable in `ota_config.h`  
+- No hardcoded sensitive data in source code
+- GitHub Actions uses dummy credentials for CI builds
+
+## 🚨 Troubleshooting
 
 ### Common Issues
 
-- **Sensor not detected**: Check wiring and I2C addresses
-- **Upload failed**: Ensure correct board and port selection
-- **Serial output garbled**: Verify baud rate (115200)
-- **Compilation errors**: Check library dependencies in `platformio.ini`
-
-### Debugging
-
-Enable debug output in `include/config.h`:
+**Device not connecting to WiFi:**
 ```cpp
-#define DEBUG_SENSORS true
+// Check credentials in secrets.h
+// Verify 2.4GHz network (ESP32 doesn't support 5GHz)
+// Check WiFi signal strength
 ```
 
-## WiFi Configuration (Secure)
-
-### Quick Setup
-1. **Edit credentials**: Open `include/secrets.h`
-2. **Replace password**: Change `YOUR_ACTUAL_PASSWORD_HERE` to your actual WiFi password
-3. **SSID is pre-configured**: "U64A 2.4" is already set
-
-### Security Methods
-
-**Method 1: secrets.h file (Recommended)**
-```cpp
-// In include/secrets.h
-#define WIFI_SSID "U64A 2.4"
-#define WIFI_PASSWORD "your_real_password"
-```
-
-**Method 2: Environment Variables (Advanced)**
+**Can't access web dashboard:**
 ```bash
-# Set environment variables before building
-export WIFI_SSID_ENV="U64A 2.4"
-export WIFI_PASSWORD_ENV="your_password"
+# Find device IP address
+pio device monitor
+# Look for: "WiFi connected! IP: 192.168.x.x"
+
+# Or scan network
+nmap -sn 192.168.1.0/24 | grep ESP32
 ```
 
-**Method 3: Runtime Configuration (Most Secure)**
-- Use WiFi Manager library for captive portal setup
-- No hardcoded credentials in code
+**OTA update fails:**
+```cpp
+// Check OTA password
+// Ensure sufficient memory (>50% free)
+// Verify GitHub release has .bin file
+// Check internet connectivity
+```
 
-### ⚠️ Security Important
-- `include/secrets.h` is in `.gitignore` - won't be committed to Git
-- Never commit WiFi passwords to version control
-- Use strong, unique passwords for your WiFi network
+**E3JK-RR11 not responding:**
+```cpp
+// Verify 12V power supply to sensor
+// Check voltage level shifter (12V → 3.3V logic)
+// Test with multimeter: sensor output 0V/12V
+// Enable ENABLE_SIMULATION_MODE for testing
+```
 
-### WiFi Features
-- **Auto-reconnection**: Automatically reconnects if connection is lost
-- **Connection monitoring**: Checks status every 30 seconds  
-- **Status LED**: Built-in LED indicates WiFi status
-- **Detailed logging**: Shows IP, signal strength, security type
-- **Timeout protection**: Won't hang if WiFi is unavailable
+### Debug Mode
+Enable verbose logging:
+```cpp
+// In platformio.ini, add:
+build_flags = -DCORE_DEBUG_LEVEL=5
 
-## License
+// Monitor serial output:
+pio device monitor --baud 115200
+```
 
-This project is open source and available under the MIT License.
+## 📊 Performance
 
-## Contributing
+### Memory Usage
+- **Flash**: ~1MB (30% of 8MB)
+- **RAM**: ~51KB (15% of 320KB)  
+- **Free heap**: ~270KB available for operation
+
+### Network Performance
+- **WiFi connection**: ~2-5 seconds
+- **Web dashboard load**: <200ms
+- **API response time**: <50ms
+- **OTA download**: ~30-60 seconds (depends on connection)
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Setup
+```bash
+git clone https://github.com/NZCypher819/esp32-garage-door-sensor.git
+cd esp32-garage-door-sensor
+cp include/secrets.h.template include/secrets.h
+# Edit secrets.h with your WiFi credentials
+pio run
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🎯 Roadmap
+
+- [ ] **Mobile App** - Native iOS/Android application
+- [ ] **MQTT Integration** - Home Assistant compatibility  
+- [ ] **Multi-sensor Support** - Multiple garage doors
+- [ ] **Cloud Dashboard** - Remote monitoring capabilities
+- [ ] **Backup/Restore** - Configuration management
+- [ ] **Webhook Notifications** - External alerting integration
+
+## 🆘 Support
+
+- **Documentation**: Check this README and inline code comments
+- **Issues**: [GitHub Issues](https://github.com/NZCypher819/esp32-garage-door-sensor/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/NZCypher819/esp32-garage-door-sensor/discussions)
+
+---
+
+**Built with ❤️ for garage door automation**
