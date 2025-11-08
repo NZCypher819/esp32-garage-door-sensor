@@ -114,6 +114,10 @@ bool OTAManager::checkForUpdate() {
     Serial.flush();
     delay(100);  // Allow serial output to complete
     
+    // Also use ESP32 logging system for visibility
+    log_i("OTA UPDATE CHECK STARTED - Current: %s", currentVersion.c_str());
+    log_i("Connecting to: %s", OTA_UPDATE_URL);
+    
     HTTPClient http;
     http.begin(OTA_UPDATE_URL);
     http.addHeader("User-Agent", "ESP32-GarageDoor-OTA");
@@ -171,6 +175,9 @@ bool OTAManager::checkForUpdate() {
             Serial.flush();
             delay(100);
             
+            // Also use ESP32 logging for visibility
+            log_i("LATEST VERSION FROM API: %s", latestVersion.c_str());
+            
             // Remove 'v' prefix if present for comparison
             String compareVersion = latestVersion;
             if (compareVersion.startsWith("v")) {
@@ -189,6 +196,9 @@ bool OTAManager::checkForUpdate() {
             Serial.flush();
             delay(100);
             
+            // Log comparison with ESP32 logging
+            log_i("COMPARING versions: '%s' vs '%s'", currentVersion.c_str(), compareVersion.c_str());
+            
             if (compareVersion != currentVersion) {
                 statusMessage = "Update available: " + latestVersion;
                 Serial.println("");
@@ -202,6 +212,9 @@ bool OTAManager::checkForUpdate() {
                 Serial.println("****************************************");
                 Serial.flush();
                 delay(200);
+                
+                // Critical update notification using ESP32 logging
+                log_w("UPDATE AVAILABLE: %s -> %s", currentVersion.c_str(), latestVersion.c_str());
                 
                 // Look for firmware asset
                 JsonArray assets = doc["assets"];
@@ -239,6 +252,7 @@ bool OTAManager::checkForUpdate() {
                 Serial.println("========================================");
                 Serial.println("    Firmware is UP TO DATE");
                 Serial.println("========================================");
+                log_i("Firmware is UP TO DATE - no update needed");
             }
         } else {
             statusMessage = "Invalid response from update server";

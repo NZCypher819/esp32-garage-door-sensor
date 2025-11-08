@@ -12,7 +12,7 @@
 
 // OTA Update URLs (GitHub releases API)
 #define OTA_UPDATE_URL "https://api.github.com/repos/NZCypher819/esp32-garage-door-sensor/releases/latest"
-#define OTA_CHECK_INTERVAL 60000  // Check for updates every 60 seconds in development
+#define OTA_CHECK_INTERVAL 60000  // Check for updates every 60 seconds
 
 // GitHub API Authentication (required for private repositories)
 // Generate a Personal Access Token with 'public_repo' scope at:
