@@ -56,6 +56,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        # Get current UTC timestamp
+        BUILD_DATE=$(date -u +'%Y-%m-%d %H:%M:%S UTC')
+        
         # Create the release
         gh release create ${{ inputs.version }} \
           --title "ESP32 Garage Door Sensor ${{ inputs.version }}" \
@@ -96,7 +99,7 @@ jobs:
         - Keep firmware updated
         
         ---
-        **Built on:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')  
+        **Built on:** ${BUILD_DATE}  
         **Commit:** ${{ github.sha }}  
         **Firmware Size:** ~1MB (30% flash usage)  
         **Memory Usage:** ~51KB RAM (15% usage)"
