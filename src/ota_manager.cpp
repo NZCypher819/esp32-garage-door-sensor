@@ -62,17 +62,23 @@ void OTAManager::loop() {
         millis() - lastUpdateCheck > OTA_CHECK_INTERVAL) {
         
         // Log heap memory before OTA check (for memory monitoring)
-        Serial.printf("[MEM] Free heap before OTA check: %d bytes\n", ESP.getFreeHeap());
+        Serial.println("");
+        Serial.print("[MEMORY] Free heap before OTA check: ");
+        Serial.print(ESP.getFreeHeap());
+        Serial.println(" bytes");
         
         checkForUpdate();
         lastUpdateCheck = millis();
         
         // Log heap memory after OTA check
-        Serial.printf("[MEM] Free heap after OTA check: %d bytes\n", ESP.getFreeHeap());
+        Serial.print("[MEMORY] Free heap after OTA check: ");
+        Serial.print(ESP.getFreeHeap());
+        Serial.println(" bytes");
+        Serial.flush();
         
         // Force garbage collection if available heap is low (less than 50KB)
         if (ESP.getFreeHeap() < 50000) {
-            Serial.println("[MEM] Low memory detected, triggering cleanup");
+            Serial.println("[MEMORY] Low memory detected, triggering cleanup");
             // Force any pending operations to complete
             delay(100);
         }
@@ -97,12 +103,16 @@ bool OTAManager::checkForUpdate() {
     currentStatus = OTA_UPDATE_CHECKING;
     statusMessage = "Checking for updates...";
     
-    // Force flush any pending logs before network operation
+    Serial.println("");
+    Serial.println("========================================");
+    Serial.println("      OTA UPDATE CHECK STARTED");
+    Serial.println("========================================");
+    Serial.print("Current version: ");
+    Serial.println(currentVersion);
+    Serial.print("Connecting to: ");
+    Serial.println(OTA_UPDATE_URL);
     Serial.flush();
-    
-    Serial.println("=== OTA UPDATE CHECK STARTED ===");
-    Serial.printf("Current version: %s\n", currentVersion.c_str());
-    Serial.printf("Connecting to: %s\n", OTA_UPDATE_URL);
+    delay(100);  // Allow serial output to complete
     
     HTTPClient http;
     http.begin(OTA_UPDATE_URL);
@@ -118,55 +128,100 @@ bool OTAManager::checkForUpdate() {
     }
     
     Serial.println("Sending HTTP GET request...");
+    Serial.flush();
     int httpCode = http.GET();
     
-    Serial.printf("=== GitHub API Response: %d ===\n", httpCode);
-    Serial.flush();  // Ensure logs are output immediately
+    Serial.println("========================================");
+    Serial.print("GitHub API Response Code: ");
+    Serial.println(httpCode);
+    Serial.println("========================================");
+    Serial.flush();
+    delay(50);
     
     if (httpCode == HTTP_CODE_OK) {
         String payload = http.getString();
-        Serial.printf("Received %d bytes of JSON data\n", payload.length());
-        Serial.println("=== Parsing JSON Response ===");
+        Serial.print("Received JSON payload: ");
+        Serial.print(payload.length());
+        Serial.println(" bytes");
+        Serial.println("----------------------------------------");
+        Serial.println("Parsing JSON Response...");
+        Serial.flush();
+        delay(50);
         
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, payload);
         
         if (error) {
-            Serial.printf("JSON parse error: %s\n", error.c_str());
+            Serial.print("!!! JSON PARSE ERROR: ");
+            Serial.println(error.c_str());
             statusMessage = "Failed to parse update response";
             currentStatus = OTA_UPDATE_IDLE;
             http.end();
             return false;
         }
         
+        Serial.println("JSON parsed successfully!");
+        
         if (!doc["tag_name"].isNull()) {
             latestVersion = doc["tag_name"].as<String>();
-            Serial.printf("=== Latest version from API: %s ===\n", latestVersion.c_str());
+            Serial.println("========================================");
+            Serial.print(">>> LATEST VERSION FROM API: ");
+            Serial.println(latestVersion);
+            Serial.println("========================================");
+            Serial.flush();
+            delay(100);
             
             // Remove 'v' prefix if present for comparison
             String compareVersion = latestVersion;
             if (compareVersion.startsWith("v")) {
                 compareVersion = compareVersion.substring(1);
+                Serial.print("Stripped 'v' prefix: ");
+                Serial.println(compareVersion);
             }
-            Serial.printf("=== Version Comparison: %s vs %s ===\n", currentVersion.c_str(), compareVersion.c_str());
+            
+            Serial.println("----------------------------------------");
+            Serial.print("COMPARING: '");
+            Serial.print(currentVersion);
+            Serial.print("' vs '");
+            Serial.print(compareVersion);
+            Serial.println("'");
+            Serial.println("----------------------------------------");
+            Serial.flush();
+            delay(100);
             
             if (compareVersion != currentVersion) {
                 statusMessage = "Update available: " + latestVersion;
-                Serial.printf("*** UPDATE AVAILABLE: %s -> %s ***\n", currentVersion.c_str(), latestVersion.c_str());
-                Serial.flush();  // Force immediate output
+                Serial.println("");
+                Serial.println("****************************************");
+                Serial.println("***      UPDATE AVAILABLE!!!        ***");
+                Serial.print("***  ");
+                Serial.print(currentVersion);
+                Serial.print(" -> ");
+                Serial.print(latestVersion);
+                Serial.println("  ***");
+                Serial.println("****************************************");
+                Serial.flush();
+                delay(200);
                 
                 // Look for firmware asset
                 JsonArray assets = doc["assets"];
-                Serial.printf("Checking %d assets for firmware binary\n", assets.size());
+                Serial.print("Checking ");
+                Serial.print(assets.size());
+                Serial.println(" assets for firmware binary");
                 
                 for (JsonVariant asset : assets) {
                     String name = asset["name"];
-                    Serial.printf("Found asset: %s\n", name.c_str());
+                    Serial.print("Asset found: ");
+                    Serial.println(name);
                     
                     if (name.endsWith(".bin") && name.indexOf("firmware") >= 0) {
                         String downloadUrl = asset["browser_download_url"];
-                        Serial.printf("*** FIRMWARE FOUND: %s ***\n", name.c_str());
-                        Serial.printf("Download URL: %s\n", downloadUrl.c_str());
+                        Serial.println("****************************************");
+                        Serial.print("*** FIRMWARE BINARY FOUND: ");
+                        Serial.println(name);
+                        Serial.print("*** Download URL: ");
+                        Serial.println(downloadUrl);
+                        Serial.println("****************************************");
                         
                         // Auto-update can be enabled here
                         // performUpdate(downloadUrl);
@@ -177,30 +232,42 @@ bool OTAManager::checkForUpdate() {
                         return true;
                     }
                 }
-                Serial.println("No .bin firmware file found in release assets");
+                Serial.println("!!! No .bin firmware file found in release assets !!!");
                 statusMessage = "No firmware binary found in release";
             } else {
                 statusMessage = "Firmware up to date";
-                Serial.println("=== Firmware is up to date ===");
+                Serial.println("========================================");
+                Serial.println("    Firmware is UP TO DATE");
+                Serial.println("========================================");
             }
         } else {
             statusMessage = "Invalid response from update server";
-            Serial.println("ERROR: No tag_name in API response");
-            Serial.printf("Response keys: %s\n", payload.substring(0, 200).c_str());
+            Serial.println("!!! ERROR: No tag_name in API response !!!");
+            // Show first 200 chars of response for debugging
+            Serial.print("Response preview: ");
+            Serial.println(payload.substring(0, 200));
         }
     } else {
         statusMessage = "Failed to check for updates: " + String(httpCode);
-        Serial.printf("*** API request failed with code: %d ***\n", httpCode);
+        Serial.println("****************************************");
+        Serial.print("*** API REQUEST FAILED: Code ");
+        Serial.println(httpCode);
+        Serial.println("****************************************");
         if (httpCode > 0) {
             String response = http.getString();
-            Serial.printf("Error response: %s\n", response.substring(0, 200).c_str());
+            Serial.print("Error response (first 200 chars): ");
+            Serial.println(response.substring(0, 200));
         }
+        Serial.flush();
     }
     
     currentStatus = OTA_UPDATE_IDLE;
     http.end();
-    Serial.println("=== OTA CHECK COMPLETE ===");
-    Serial.flush();  // Ensure all logs are flushed before continuing
+    Serial.println("========================================");
+    Serial.println("      OTA CHECK COMPLETE");
+    Serial.println("========================================");
+    Serial.flush();
+    delay(100);  // Ensure all logs are flushed
     
     return false;
 }
