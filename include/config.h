@@ -15,7 +15,7 @@
 #include "wifi_config.h"
 
 // Testing Configuration
-#define ENABLE_SIMULATION_MODE    // Enable for testing without hardware
+// #define ENABLE_SIMULATION_MODE    // Enable for testing without hardware (DISABLED)
 #define SIMULATION_BEAM_INTERVAL 10000  // Simulate beam break every 10 seconds
 
 // Sensor Configuration
