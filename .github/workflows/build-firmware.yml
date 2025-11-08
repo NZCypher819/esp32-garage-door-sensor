@@ -90,28 +90,18 @@ jobs:
         path: firmware-release/
         retention-days: 30
         
-    # Only run on releases
-    - name: Attach firmware to release
+    # Only run on releases - use GitHub CLI
+    - name: Attach firmware to release  
       if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: firmware-release/firmware.bin
-        asset_name: esp32-garage-door-firmware-${{ github.event.release.tag_name }}.bin
-        asset_content_type: application/octet-stream
-        
-    - name: Attach firmware info to release
-      if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: firmware-release/firmware-info.json
-        asset_name: firmware-info.json
-        asset_content_type: application/json
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Upload firmware binary and info to the release
+        gh release upload ${{ github.event.release.tag_name }} \
+          firmware-release/firmware.bin#esp32-garage-door-firmware-${{ github.event.release.tag_name }}.bin \
+          firmware-release/firmware-info.json#firmware-info.json \
+          --clobber
 
   security-scan:
     runs-on: ubuntu-latest

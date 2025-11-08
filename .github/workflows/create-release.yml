@@ -51,58 +51,55 @@ jobs:
         grep "FIRMWARE_VERSION" include/ota_config.h
         grep '"version":' src/web_server.cpp | head -1
         
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
+    - name: Create Release and Upload Assets
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ inputs.version }}
-        release_name: ESP32 Garage Door Sensor ${{ inputs.version }}
-        body: |
-          ## ESP32 Garage Door Sensor Release ${{ inputs.version }}
-          
-          ### 🚀 Features
-          - E3JK-RR11 photoelectric sensor support
-          - Real-time web dashboard monitoring
-          - WiFi connectivity with secure credential management
-          - Over-the-air (OTA) firmware updates
-          - Simulation mode for testing without hardware
-          - Mobile-responsive web interface
-          
-          ### 📦 Installation
-          1. Download `esp32-garage-door-firmware-${{ inputs.version }}.bin`
-          2. Flash to your ESP32 S3 Nano using:
-             - **PlatformIO**: `pio run -t upload`
-             - **Arduino IDE**: Tools → Port → Upload
-             - **Web OTA**: Access existing device web interface at `/update`
-          
-          ### 🔧 Configuration
-          1. Copy `include/secrets.h.template` to `include/secrets.h`
-          2. Update WiFi credentials in `secrets.h`
-          3. Compile and upload firmware
-          
-          ### 🌐 OTA Updates
-          After flashing this firmware, future updates can be installed:
-          - **Network OTA**: Via Arduino IDE/PlatformIO over WiFi
-          - **Web OTA**: Visit `http://[device-ip]/update` (admin/GarageDoor2025)
-          - **Automatic**: Device checks for updates every 60 seconds
-          
-          ### 📋 Changelog
-          ${{ inputs.changelog }}
-          
-          ### 🔒 Security Notes
-          - Change default OTA password in `ota_config.h`
-          - Secure your WiFi network
-          - Keep firmware updated
-          
-          ---
-          **Built on:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")  
-          **Commit:** ${{ github.sha }}  
-          **Firmware Size:** ~1MB (30% flash usage)  
-          **Memory Usage:** ~51KB RAM (15% usage)
-        draft: false
-        prerelease: false
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Create the release
+        gh release create ${{ inputs.version }} \
+          --title "ESP32 Garage Door Sensor ${{ inputs.version }}" \
+          --notes "## ESP32 Garage Door Sensor Release ${{ inputs.version }}
+        
+        ### 🚀 Features
+        - E3JK-RR11 photoelectric sensor support
+        - Real-time web dashboard monitoring
+        - WiFi connectivity with secure credential management
+        - Over-the-air (OTA) firmware updates
+        - Simulation mode for testing without hardware
+        - Mobile-responsive web interface
+        
+        ### 📦 Installation
+        1. Download \`esp32-garage-door-firmware-${{ inputs.version }}.bin\`
+        2. Flash to your ESP32 S3 Nano using:
+           - **PlatformIO**: \`pio run -t upload\`
+           - **Arduino IDE**: Tools → Port → Upload
+           - **Web OTA**: Access existing device web interface at \`/update\`
+        
+        ### 🔧 Configuration
+        1. Copy \`include/secrets.h.template\` to \`include/secrets.h\`
+        2. Update WiFi credentials in \`secrets.h\`
+        3. Compile and upload firmware
+        
+        ### 🌐 OTA Updates
+        After flashing this firmware, future updates can be installed:
+        - **Network OTA**: Via Arduino IDE/PlatformIO over WiFi
+        - **Web OTA**: Visit \`http://[device-ip]/update\` (admin/GarageDoor2025)
+        - **Automatic**: Device checks for updates every 60 seconds
+        
+        ### 📋 Changelog
+        ${{ inputs.changelog }}
+        
+        ### 🔒 Security Notes
+        - Change default OTA password in \`ota_config.h\`
+        - Secure your WiFi network
+        - Keep firmware updated
+        
+        ---
+        **Built on:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')  
+        **Commit:** ${{ github.sha }}  
+        **Firmware Size:** ~1MB (30% flash usage)  
+        **Memory Usage:** ~51KB RAM (15% usage)"
         
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -124,12 +121,12 @@ jobs:
       run: |
         platformio run --environment esp32-s3-devkitc-1
         
-    - name: Upload firmware binary
-      uses: actions/upload-release-asset@v1
+    - name: Upload firmware to release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: .pio/build/esp32-s3-devkitc-1/firmware.bin
-        asset_name: esp32-garage-door-firmware-${{ inputs.version }}.bin
-        asset_content_type: application/octet-stream
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Upload firmware binary to the release
+        gh release upload ${{ inputs.version }} \
+          .pio/build/esp32-s3-devkitc-1/firmware.bin#esp32-garage-door-firmware-${{ inputs.version }}.bin \
+          --clobber
