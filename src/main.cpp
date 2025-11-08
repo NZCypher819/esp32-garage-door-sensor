@@ -4,6 +4,7 @@
 #ifdef ENABLE_WIFI
 #include "wifi_manager.h"
 #include "web_server.h"
+#include "ota_manager.h"
 #endif
 
 void setup() {
@@ -28,6 +29,8 @@ void setup() {
   delay(2000);  // Give WiFi time to settle
   if (isWiFiConnected()) {
     printWiFiInfo();
+    // Initialize OTA manager
+    otaManager.init();
     // Start web server
     initWebServer();
     addLogEntry("System started successfully", "INFO");
@@ -42,6 +45,8 @@ void loop() {
   #ifdef ENABLE_WIFI
   checkWiFiConnection();
   handleWebServer();
+  // Handle OTA updates
+  otaManager.loop();
   #endif
   
   // Read sensors periodically

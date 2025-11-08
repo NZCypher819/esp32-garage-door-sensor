@@ -1,6 +1,7 @@
 #include "web_server.h"
 #include "sensors.h"
 #include "wifi_manager.h"
+#include "ota_manager.h"
 
 // Include missing extern declaration
 extern SensorData currentSensorData;
@@ -44,6 +45,20 @@ void initWebServer() {
         logEntries.clear();
         addLogEntry("Logs cleared by user", "INFO");
         server.send(200, "application/json", "{\"status\":\"success\"}");
+    });
+
+    // OTA endpoints
+    server.on("/api/ota/status", HTTP_GET, []() {
+        server.send(200, "application/json", getOTAStatusJSON());
+    });
+
+    server.on("/api/ota/check", HTTP_POST, []() {
+        otaManager.triggerUpdateCheck();
+        server.send(200, "application/json", "{\"status\":\"checking\"}");
+    });
+
+    server.on("/api/ota/info", HTTP_GET, []() {
+        server.send(200, "application/json", getOTAInfoJSON());
     });
 
     // CSS styles
@@ -152,6 +167,32 @@ String getSystemInfoJSON() {
     return jsonString;
 }
 
+String getOTAStatusJSON() {
+    JsonDocument doc;
+    
+    doc["status"] = (int)otaManager.getStatus();
+    doc["message"] = otaManager.getStatusMessage();
+    doc["enabled"] = OTA_ENABLED;
+    
+    String jsonString;
+    serializeJson(doc, jsonString);
+    return jsonString;
+}
+
+String getOTAInfoJSON() {
+    JsonDocument doc;
+    
+    doc["current_version"] = otaManager.getCurrentVersion();
+    doc["latest_version"] = otaManager.getLatestVersion();
+    doc["firmware_name"] = FIRMWARE_NAME;
+    doc["update_url"] = OTA_UPDATE_URL;
+    doc["web_update_url"] = "/update";
+    
+    String jsonString;
+    serializeJson(doc, jsonString);
+    return jsonString;
+}
+
 String getMainPageHTML() {
     return R"(
 <!DOCTYPE html>
@@ -200,8 +241,23 @@ String getMainPageHTML() {
             </div>
         </section>
 
+        <section class="ota-section">
+            <h3>🔄 OTA Updates</h3>
+            <div class="ota-info">
+                <div class="ota-status">
+                    <div>Status: <span id="ota-status">--</span></div>
+                    <div>Current: <span id="ota-current-version">--</span></div>
+                    <div>Latest: <span id="ota-latest-version">--</span></div>
+                </div>
+                <div class="ota-controls">
+                    <button id="check-update">Check for Update</button>
+                    <button id="web-update">Web Update</button>
+                </div>
+            </div>
+        </section>
+
         <section class="logs-section">
-            <h3>📋 System Logs</h3>
+            <h3>System Logs</h3>
             <div class="logs-controls">
                 <button id="clear-logs">Clear Logs</button>
                 <button id="refresh-logs">Refresh</button>
@@ -330,6 +386,32 @@ main {
     box-shadow: 0 8px 32px rgba(0,0,0,0.1);
 }
 
+.ota-section {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1.5rem;
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.ota-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.ota-status div {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.ota-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
 .logs-controls {
     margin-bottom: 1rem;
     display: flex;
@@ -428,13 +510,22 @@ class GarageDoorMonitor {
         document.getElementById('refresh-logs').addEventListener('click', () => {
             this.loadLogs();
         });
+
+        document.getElementById('check-update').addEventListener('click', () => {
+            this.checkForUpdate();
+        });
+
+        document.getElementById('web-update').addEventListener('click', () => {
+            window.open('/update', '_blank');
+        });
     }
 
     async loadInitialData() {
         await Promise.all([
             this.loadStatus(),
             this.loadLogs(),
-            this.loadSystemInfo()
+            this.loadSystemInfo(),
+            this.loadOTAInfo()
         ]);
     }
 
@@ -453,6 +544,11 @@ class GarageDoorMonitor {
         setInterval(() => {
             this.loadSystemInfo();
         }, 10000);
+
+        // Update OTA status every 30 seconds
+        setInterval(() => {
+            this.loadOTAStatus();
+        }, 30000);
     }
 
     async loadStatus() {
@@ -597,6 +693,60 @@ class GarageDoorMonitor {
         const ms = parseInt(timestamp);
         const seconds = Math.floor(ms / 1000);
         return new Date(Date.now() - (Date.now() % 1000) + (ms % 1000)).toLocaleTimeString();
+    }
+
+    async loadOTAInfo() {
+        try {
+            const response = await fetch('/api/ota/info');
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('ota-current-version').textContent = data.current_version || '--';
+                document.getElementById('ota-latest-version').textContent = data.latest_version || '--';
+            }
+        } catch (error) {
+            console.error('Failed to load OTA info:', error);
+        }
+    }
+
+    async loadOTAStatus() {
+        try {
+            const response = await fetch('/api/ota/status');
+            if (response.ok) {
+                const data = await response.json();
+                const statusTexts = ['Idle', 'Checking', 'Downloading', 'Installing', 'Success', 'Error'];
+                const statusText = statusTexts[data.status] || 'Unknown';
+                document.getElementById('ota-status').textContent = statusText;
+                
+                if (data.message) {
+                    document.getElementById('ota-status').title = data.message;
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load OTA status:', error);
+        }
+    }
+
+    async checkForUpdate() {
+        try {
+            const button = document.getElementById('check-update');
+            button.disabled = true;
+            button.textContent = 'Checking...';
+            
+            const response = await fetch('/api/ota/check', { method: 'POST' });
+            if (response.ok) {
+                setTimeout(() => {
+                    this.loadOTAStatus();
+                    this.loadOTAInfo();
+                }, 2000);
+            }
+            
+            setTimeout(() => {
+                button.disabled = false;
+                button.textContent = 'Check for Update';
+            }, 3000);
+        } catch (error) {
+            console.error('Failed to check for update:', error);
+        }
     }
 }
 

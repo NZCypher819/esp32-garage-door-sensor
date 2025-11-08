@@ -15,6 +15,8 @@ void addLogEntry(String message, String level = "INFO");
 String getStatusJSON();
 String getLogsJSON();
 String getSystemInfoJSON();
+String getOTAStatusJSON();
+String getOTAInfoJSON();
 String getMainPageHTML();
 String getCSS();
 String getJavaScript();
