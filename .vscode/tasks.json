@@ -1,0 +1,54 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "PlatformIO Build",
+			"type": "shell",
+			"command": "${env:USERPROFILE}\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run"
+			],
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "PlatformIO Upload",
+			"type": "shell",
+			"command": "${env:USERPROFILE}\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run",
+				"--target",
+				"upload"
+			],
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build",
+			"dependsOn": "PlatformIO Build"
+		},
+		{
+			"label": "PlatformIO Monitor",
+			"type": "shell",
+			"command": "${env:USERPROFILE}\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"device",
+				"monitor"
+			],
+			"isBackground": true,
+			"group": "test"
+		},
+		{
+			"label": "PlatformIO Clean",
+			"type": "shell",
+			"command": "${env:USERPROFILE}\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run",
+				"--target",
+				"clean"
+			],
+			"group": "build"
+		}
+	]
+}
