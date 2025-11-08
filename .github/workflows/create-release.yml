@@ -87,7 +87,7 @@ jobs:
         ### 🌐 OTA Updates
         After flashing this firmware, future updates can be installed:
         - **Network OTA**: Via Arduino IDE/PlatformIO over WiFi
-        - **Web OTA**: Visit \`http://[device-ip]/update\` (admin/GarageDoor2025)
+        - **Web OTA**: Visit \`http://[device-ip]/update\` (admin/[your-password])
         - **Automatic**: Device checks for updates every 60 seconds
         
         ### 📋 Changelog

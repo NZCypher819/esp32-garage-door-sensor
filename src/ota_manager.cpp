@@ -86,24 +86,37 @@ bool OTAManager::checkForUpdate() {
     http.begin(OTA_UPDATE_URL);
     http.addHeader("User-Agent", "ESP32-GarageDoor-OTA");
     
+    // Add GitHub authentication if token is provided
+    if (strlen(GITHUB_TOKEN) > 0) {
+        String authHeader = "Bearer " + String(GITHUB_TOKEN);
+        http.addHeader("Authorization", authHeader.c_str());
+    }
+    
     int httpCode = http.GET();
+    
+    Serial.printf("GitHub API Response: %d\n", httpCode);
     
     if (httpCode == HTTP_CODE_OK) {
         String payload = http.getString();
+        Serial.println("API Response received");
+        
         JsonDocument doc;
         deserializeJson(doc, payload);
         
         if (!doc["tag_name"].isNull()) {
             latestVersion = doc["tag_name"].as<String>();
+            Serial.printf("Latest version from API: %s\n", latestVersion.c_str());
             
             // Remove 'v' prefix if present
             String compareVersion = latestVersion;
             if (compareVersion.startsWith("v")) {
                 compareVersion = compareVersion.substring(1);
             }
+            Serial.printf("Comparing %s vs %s\n", currentVersion.c_str(), compareVersion.c_str());
             
             if (compareVersion != currentVersion) {
                 statusMessage = "Update available: " + latestVersion;
+                Serial.printf("UPDATE AVAILABLE: %s -> %s\n", currentVersion.c_str(), latestVersion.c_str());
                 
                 // Look for firmware asset
                 JsonArray assets = doc["assets"];
@@ -126,12 +139,15 @@ bool OTAManager::checkForUpdate() {
                 statusMessage = "No firmware binary found in release";
             } else {
                 statusMessage = "Firmware up to date";
+                Serial.println("Firmware is up to date");
             }
         } else {
             statusMessage = "Invalid response from update server";
+            Serial.println("No tag_name in API response");
         }
     } else {
         statusMessage = "Failed to check for updates: " + String(httpCode);
+        Serial.printf("API request failed with code: %d\n", httpCode);
     }
     
     currentStatus = OTA_UPDATE_IDLE;

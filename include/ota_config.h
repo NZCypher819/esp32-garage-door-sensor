@@ -14,6 +14,12 @@
 #define OTA_UPDATE_URL "https://api.github.com/repos/NZCypher819/esp32-garage-door-sensor/releases/latest"
 #define OTA_CHECK_INTERVAL 60000  // Check for updates every 60 seconds in development
 
+// GitHub API Authentication (required for private repositories)
+// Generate a Personal Access Token with 'public_repo' scope at:
+// https://github.com/settings/personal-access-tokens/tokens
+// #define GITHUB_TOKEN "ghp_your_token_here"  // Uncomment and add your token
+#define GITHUB_TOKEN ""  // Leave empty for public repositories
+
 // OTA Status
 enum OTAUpdateStatus {
     OTA_UPDATE_IDLE,

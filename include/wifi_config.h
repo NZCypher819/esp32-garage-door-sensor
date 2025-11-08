@@ -12,11 +12,11 @@
 
 // Fallback values if not defined in secrets.h or environment
 #ifndef WIFI_SSID
-  #define WIFI_SSID "U64A 2.4"  // Default SSID
+  #define WIFI_SSID "YOUR_WIFI_SSID"  // Set in secrets.h
 #endif
 
 #ifndef WIFI_PASSWORD
-  #define WIFI_PASSWORD "CHANGE_ME"  // Placeholder - set in secrets.h
+  #define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"  // Set in secrets.h
 #endif
 
 // WiFi Settings

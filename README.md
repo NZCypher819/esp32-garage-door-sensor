@@ -108,7 +108,7 @@ The device automatically checks GitHub releases every 60 seconds and can update 
 
 **1. Web Interface:**
 - Visit `http://[device-ip]/update`  
-- Login: `admin` | Password: `GarageDoor2025`
+- Login: `admin` | Password: `[your-ota-password]`
 - Upload `.bin` file directly
 
 **2. Network OTA (Arduino IDE/PlatformIO):**
@@ -178,10 +178,10 @@ pio run -t upload
 
 ### OTA Settings (`ota_config.h`)
 ```cpp
-#define OTA_PASSWORD "GarageDoor2025"     // Change this!
-#define OTA_PORT 3232                    // Network OTA port
-#define FIRMWARE_VERSION "1.0.0"         // Current version
-#define OTA_CHECK_INTERVAL 60000         // Update check interval (ms)
+#define OTA_PASSWORD "your-secure-password"  // Change this!
+#define OTA_PORT 3232                        // Network OTA port
+#define FIRMWARE_VERSION "1.0.0"             // Current version
+#define OTA_CHECK_INTERVAL 60000             // Update check interval (ms)
 ```
 
 ### Sensor Configuration (`config.h`)
