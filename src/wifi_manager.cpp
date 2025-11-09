@@ -1,16 +1,45 @@
 #include "wifi_manager.h"
+#include <Preferences.h>
 
 #ifdef ENABLE_WIFI
 
+Preferences wifiPrefs;
 bool wifiConnected = false;
 unsigned long lastWiFiCheck = 0;
 int wifiRetryCount = 0;
 
 void initWiFi() {
-    Serial.println("\n=== WiFi Initialization ===");
-    Serial.printf("SSID: %s\n", WIFI_SSID);
-    Serial.println("Connecting to WiFi...");
+    Serial.println("\n=== WiFi Initialization with NVS Support ===");
     
+    // Initialize NVS preferences
+    wifiPrefs.begin("wifi", false);
+    
+    // Try to load saved credentials first
+    String savedSSID = wifiPrefs.getString("ssid", "");
+    String savedPassword = wifiPrefs.getString("password", "");
+    
+    if (savedSSID.length() > 0) {
+        Serial.printf("Found saved WiFi credentials for: %s\n", savedSSID.c_str());
+        if (connectToWiFi(savedSSID, savedPassword)) {
+            return; // Successfully connected with saved credentials
+        }
+        Serial.println("Saved credentials failed, trying hardcoded...");
+    }
+    
+    // Try hardcoded credentials from secrets.h
+    Serial.printf("Trying hardcoded SSID: %s\n", WIFI_SSID);
+    if (connectToWiFi(WIFI_SSID, WIFI_PASSWORD)) {
+        // Save working credentials to NVS for future OTA updates
+        wifiPrefs.putString("ssid", WIFI_SSID);
+        wifiPrefs.putString("password", WIFI_PASSWORD);
+        Serial.println("✅ WiFi credentials saved to NVS for future OTA updates");
+        return;
+    }
+    
+    Serial.println("❌ No WiFi connection possible with saved or hardcoded credentials");
+}
+
+bool connectToWiFi(const String& ssid, const String& password) {
     // Set WiFi mode
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
@@ -22,14 +51,10 @@ void initWiFi() {
     digitalWrite(WIFI_STATUS_LED, WIFI_LED_OFF);
     #endif
     
-    connectToWiFi();
-}
-
-void connectToWiFi() {
     wifiRetryCount = 0;
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(ssid.c_str(), password.c_str());
     
-    Serial.print("Connecting");
+    Serial.printf("Connecting to %s", ssid.c_str());
     unsigned long startTime = millis();
     
     while (WiFi.status() != WL_CONNECTED && 
@@ -48,40 +73,45 @@ void connectToWiFi() {
     
     if (WiFi.status() == WL_CONNECTED) {
         wifiConnected = true;
-        Serial.println("\n✅ WiFi Connected Successfully!");
-        Serial.printf("📶 IP Address: %s\n", WiFi.localIP().toString().c_str());
-        Serial.printf("📡 Signal Strength: %d dBm\n", WiFi.RSSI());
-        Serial.printf("🔒 Security: %s\n", getSecurityType().c_str());
+        Serial.println(" Connected!");
+        Serial.printf("📶 IP address: %s\n", WiFi.localIP().toString().c_str());
+        Serial.printf("📡 Signal strength: %d dBm\n", WiFi.RSSI());
         
         #ifdef WIFI_STATUS_LED
-        digitalWrite(WIFI_STATUS_LED, WIFI_LED_ON);  // Solid on when connected
+        digitalWrite(WIFI_STATUS_LED, WIFI_LED_ON);
         #endif
+        
+        return true;
     } else {
         wifiConnected = false;
-        Serial.println("\n❌ WiFi Connection Failed!");
-        Serial.printf("Status: %s\n", getWiFiStatusString().c_str());
-        Serial.println("Will retry connection...");
+        Serial.println(" Failed!");
+        Serial.printf("Connection status: %s\n", getWiFiStatusString().c_str());
         
         #ifdef WIFI_STATUS_LED
         digitalWrite(WIFI_STATUS_LED, WIFI_LED_OFF);
         #endif
+        
+        return false;
     }
 }
 
+void connectToWiFi() {
+    String ssid = wifiPrefs.getString("ssid", WIFI_SSID);
+    String password = wifiPrefs.getString("password", WIFI_PASSWORD);
+    connectToWiFi(ssid, password);
+}
+
 void checkWiFiConnection() {
-    unsigned long currentTime = millis();
-    
-    // Check WiFi status every 30 seconds
-    if (currentTime - lastWiFiCheck >= 30000) {
-        lastWiFiCheck = currentTime;
+    if (millis() - lastWiFiCheck > 30000) { // Check every 30 seconds
+        lastWiFiCheck = millis();
         
-        if (WiFi.status() != WL_CONNECTED && wifiConnected) {
-            Serial.println("⚠️ WiFi connection lost! Attempting to reconnect...");
+        if (WiFi.status() != WL_CONNECTED) {
             wifiConnected = false;
+            Serial.println("WiFi disconnected, attempting to reconnect...");
             connectToWiFi();
-        } else if (WiFi.status() == WL_CONNECTED && !wifiConnected) {
+        } else if (!wifiConnected) {
             wifiConnected = true;
-            Serial.println("✅ WiFi reconnected!");
+            Serial.println("WiFi reconnected successfully");
         }
     }
 }
@@ -92,18 +122,20 @@ bool isWiFiConnected() {
 
 String getWiFiStatusString() {
     switch (WiFi.status()) {
-        case WL_CONNECTED: return "Connected";
-        case WL_NO_SSID_AVAIL: return "SSID not found";
-        case WL_CONNECT_FAILED: return "Connection failed";
-        case WL_DISCONNECTED: return "Disconnected";
-        case WL_CONNECTION_LOST: return "Connection lost";
-        case WL_NO_SHIELD: return "No WiFi shield";
+        case WL_IDLE_STATUS: return "Idle";
+        case WL_NO_SSID_AVAIL: return "SSID not available";
         case WL_SCAN_COMPLETED: return "Scan completed";
+        case WL_CONNECTED: return "Connected";
+        case WL_CONNECT_FAILED: return "Connection failed";
+        case WL_CONNECTION_LOST: return "Connection lost";
+        case WL_DISCONNECTED: return "Disconnected";
         default: return "Unknown status";
     }
 }
 
 String getSecurityType() {
+    if (WiFi.status() != WL_CONNECTED) return "Not connected";
+    
     switch (WiFi.encryptionType(0)) {
         case WIFI_AUTH_OPEN: return "Open";
         case WIFI_AUTH_WEP: return "WEP";
@@ -127,16 +159,41 @@ void printWiFiInfo() {
         Serial.printf("RSSI: %d dBm\n", WiFi.RSSI());
         Serial.printf("Channel: %d\n", WiFi.channel());
         Serial.println("========================");
+    } else {
+        Serial.println("WiFi not connected - cannot display info");
     }
+}
+
+// NVS management functions for WiFi credentials
+void saveWiFiCredentials(const String& ssid, const String& password) {
+    wifiPrefs.putString("ssid", ssid);
+    wifiPrefs.putString("password", password);
+    Serial.printf("📱 WiFi credentials saved to NVS: %s\n", ssid.c_str());
+}
+
+bool loadWiFiCredentials(String& ssid, String& password) {
+    ssid = wifiPrefs.getString("ssid", "");
+    password = wifiPrefs.getString("password", "");
+    return (ssid.length() > 0);
+}
+
+void clearWiFiCredentials() {
+    wifiPrefs.clear();
+    Serial.println("🗑️ WiFi credentials cleared from NVS");
 }
 
 #else
 // WiFi disabled stubs
 void initWiFi() { /* WiFi disabled */ }
 void connectToWiFi() { /* WiFi disabled */ }
+bool connectToWiFi(const String& ssid, const String& password) { return false; }
 void checkWiFiConnection() { /* WiFi disabled */ }
 bool isWiFiConnected() { return false; }
 String getWiFiStatusString() { return "WiFi disabled"; }
 String getSecurityType() { return "N/A"; }
 void printWiFiInfo() { /* WiFi disabled */ }
+void saveWiFiCredentials(const String& ssid, const String& password) { /* WiFi disabled */ }
+bool loadWiFiCredentials(String& ssid, String& password) { return false; }
+void clearWiFiCredentials() { /* WiFi disabled */ }
+
 #endif

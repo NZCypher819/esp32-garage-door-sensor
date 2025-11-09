@@ -59,12 +59,27 @@ void initWebServer() {
     });
 
     server.on("/api/ota/check", HTTP_POST, []() {
+        Serial.println("=== OTA CHECK API CALLED ===");
         otaManager.triggerUpdateCheck();
         server.send(200, "application/json", "{\"status\":\"checking\"}");
     });
 
     server.on("/api/ota/install", HTTP_POST, []() {
+        Serial.println("");
+        Serial.println("=== OTA INSTALL API CALLED ===");
+        Serial.println("Install API called - checking for updates first...");
+        
+        // First check for updates to ensure we have the latest info
+        otaManager.triggerUpdateCheck();
+        
+        // Give it a moment to complete the check
+        delay(2000);
+        
+        Serial.println("Calling installLatestRelease...");
         bool success = otaManager.installLatestRelease();
+        Serial.print("Install result: ");
+        Serial.println(success ? "SUCCESS" : "FAILED");
+        
         if (success) {
             server.send(200, "application/json", "{\"status\":\"installing\",\"message\":\"Update started, device will restart\"}");
         } else {

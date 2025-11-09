@@ -19,6 +19,12 @@
   #define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"  // Set in secrets.h
 #endif
 
+// WiFi Manager Configuration for OTA-friendly setup
+#define WIFI_MANAGER_ENABLED true     // Enable WiFi Manager for easy setup
+#define AP_NAME "ESP32-GarageDoor"    // Access Point name for setup
+#define AP_PASSWORD "setup123"       // Access Point password for setup
+#define SETUP_TIMEOUT 300000         // 5 minutes setup timeout
+
 // WiFi Settings
 #define WIFI_CONNECT_TIMEOUT 10000    // 10 seconds timeout
 #define WIFI_RETRY_DELAY 1000         // 1 second between retries

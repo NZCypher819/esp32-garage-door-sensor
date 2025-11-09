@@ -61,20 +61,8 @@ void OTAManager::loop() {
     if (WiFi.status() == WL_CONNECTED && 
         millis() - lastUpdateCheck > OTA_CHECK_INTERVAL) {
         
-        // Log heap memory before OTA check (for memory monitoring)
-        Serial.println("");
-        Serial.print("[MEMORY] Free heap before OTA check: ");
-        Serial.print(ESP.getFreeHeap());
-        Serial.println(" bytes");
-        
         checkForUpdate();
         lastUpdateCheck = millis();
-        
-        // Log heap memory after OTA check
-        Serial.print("[MEMORY] Free heap after OTA check: ");
-        Serial.print(ESP.getFreeHeap());
-        Serial.println(" bytes");
-        Serial.flush();
         
         // Force garbage collection if available heap is low (less than 50KB)
         if (ESP.getFreeHeap() < 50000) {
@@ -103,20 +91,11 @@ bool OTAManager::checkForUpdate() {
     currentStatus = OTA_UPDATE_CHECKING;
     statusMessage = "Checking for updates...";
     
-    Serial.println("");
-    Serial.println("========================================");
-    Serial.println("      OTA UPDATE CHECK STARTED");
-    Serial.println("========================================");
+    Serial.println("OTA: Checking for updates...");
     Serial.print("Current version: ");
     Serial.println(currentVersion);
-    Serial.print("Connecting to: ");
-    Serial.println(OTA_UPDATE_URL);
-    Serial.flush();
-    delay(100);  // Allow serial output to complete
     
-    // Also use ESP32 logging system for visibility
-    log_i("OTA UPDATE CHECK STARTED - Current: %s", currentVersion.c_str());
-    log_i("Connecting to: %s", OTA_UPDATE_URL);
+    log_i("OTA UPDATE CHECK - Current: %s", currentVersion.c_str());
     
     HTTPClient http;
     http.begin(OTA_UPDATE_URL);
@@ -168,36 +147,23 @@ bool OTAManager::checkForUpdate() {
         
         if (!doc["tag_name"].isNull()) {
             latestVersion = doc["tag_name"].as<String>();
-            Serial.println("========================================");
-            Serial.print(">>> LATEST VERSION FROM API: ");
+            Serial.print("Latest version: ");
             Serial.println(latestVersion);
-            Serial.println("========================================");
-            Serial.flush();
-            delay(100);
             
-            // Also use ESP32 logging for visibility
-            log_i("LATEST VERSION FROM API: %s", latestVersion.c_str());
+            log_i("Latest version: %s", latestVersion.c_str());
             
             // Remove 'v' prefix if present for comparison
             String compareVersion = latestVersion;
             if (compareVersion.startsWith("v")) {
                 compareVersion = compareVersion.substring(1);
-                Serial.print("Stripped 'v' prefix: ");
-                Serial.println(compareVersion);
             }
             
-            Serial.println("----------------------------------------");
-            Serial.print("COMPARING: '");
+            Serial.print("Comparing versions: ");
             Serial.print(currentVersion);
-            Serial.print("' vs '");
-            Serial.print(compareVersion);
-            Serial.println("'");
-            Serial.println("----------------------------------------");
-            Serial.flush();
-            delay(100);
+            Serial.print(" vs ");
+            Serial.println(compareVersion);
             
-            // Log comparison with ESP32 logging
-            log_i("COMPARING versions: '%s' vs '%s'", currentVersion.c_str(), compareVersion.c_str());
+            log_i("Comparing versions: '%s' vs '%s'", currentVersion.c_str(), compareVersion.c_str());
             
             if (compareVersion != currentVersion) {
                 statusMessage = "Update available: " + latestVersion;
@@ -229,24 +195,19 @@ bool OTAManager::checkForUpdate() {
                     
                     if (name.endsWith(".bin") && name.indexOf("firmware") >= 0) {
                         String downloadUrl = asset["browser_download_url"];
-                        Serial.println("****************************************");
-                        Serial.print("*** FIRMWARE BINARY FOUND: ");
+                        Serial.print("Firmware found: ");
                         Serial.println(name);
-                        Serial.print("*** Download URL: ");
+                        Serial.print("Download URL: ");
                         Serial.println(downloadUrl);
-                        Serial.println("****************************************");
                         
                         // Store release info for web install button
                         latestReleaseUrl = downloadUrl;
                         updateAvailable = true;
                         statusMessage = "Update available: " + latestVersion + " (Click to install)";
                         
-                        // Auto-update can be enabled here
-                        // performUpdate(downloadUrl);
-                        
                         currentStatus = OTA_UPDATE_IDLE;
                         http.end();
-                        Serial.println("=== OTA CHECK COMPLETE - UPDATE AVAILABLE ===");
+                        Serial.println("OTA: Update available");
                         return true;
                     }
                 }
@@ -256,30 +217,24 @@ bool OTAManager::checkForUpdate() {
                 statusMessage = "Firmware up to date";
                 updateAvailable = false;
                 latestReleaseUrl = "";
-                Serial.println("========================================");
-                Serial.println("    Firmware is UP TO DATE");
-                Serial.println("========================================");
-                log_i("Firmware is UP TO DATE - no update needed");
+                Serial.println("OTA: Firmware is up to date");
+                log_i("Firmware is up to date");
             }
         } else {
             statusMessage = "Invalid response from update server";
-            Serial.println("!!! ERROR: No tag_name in API response !!!");
-            // Show first 200 chars of response for debugging
+            Serial.println("OTA Error: No tag_name in API response");
             Serial.print("Response preview: ");
             Serial.println(payload.substring(0, 200));
         }
     } else {
         statusMessage = "Failed to check for updates: " + String(httpCode);
-        Serial.println("****************************************");
-        Serial.print("*** API REQUEST FAILED: Code ");
+        Serial.print("OTA Error: API request failed, code ");
         Serial.println(httpCode);
-        Serial.println("****************************************");
         if (httpCode > 0) {
             String response = http.getString();
-            Serial.print("Error response (first 200 chars): ");
+            Serial.print("Error response: ");
             Serial.println(response.substring(0, 200));
         }
-        Serial.flush();
     }
     
     currentStatus = OTA_UPDATE_IDLE;
@@ -303,6 +258,10 @@ bool OTAManager::performUpdate(String firmwareUrl) {
     
     HTTPClient http;
     http.begin(firmwareUrl);
+    
+    // Enable redirect following for GitHub releases
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    http.setRedirectLimit(5);
     
     int httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK) {
@@ -356,23 +315,25 @@ bool OTAManager::performUpdate(String firmwareUrl) {
 }
 
 bool OTAManager::installLatestRelease() {
+    Serial.println("OTA: Install latest release requested");
+    Serial.print("Available: ");
+    Serial.println(updateAvailable ? "true" : "false");
+    Serial.print("URL: ");
+    Serial.println(latestReleaseUrl);
+    
     if (!updateAvailable || latestReleaseUrl.isEmpty()) {
-        Serial.println("No update available to install");
-        log_w("Install requested but no update available");
+        Serial.println("OTA Error: No update available or URL empty");
         return false;
     }
     
-    Serial.println("========================================");
-    Serial.println("   INSTALLING LATEST GITHUB RELEASE");
-    Serial.println("========================================");
-    Serial.print("Installing: ");
+    Serial.println("Installing update...");
+    Serial.print("Version: ");
     Serial.println(latestVersion);
-    Serial.print("From URL: ");
-    Serial.println(latestReleaseUrl);
     
-    log_i("Installing latest release: %s", latestVersion.c_str());
-    log_i("Download URL: %s", latestReleaseUrl.c_str());
+    log_i("Installing update: %s", latestVersion.c_str());
     
-    // Use existing performUpdate method
-    return performUpdate(latestReleaseUrl);
+    bool result = performUpdate(latestReleaseUrl);
+    Serial.print("Install result: ");
+    Serial.println(result ? "SUCCESS" : "FAILED");
+    return result;
 }
