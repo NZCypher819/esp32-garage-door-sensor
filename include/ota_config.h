@@ -7,7 +7,7 @@
 #define OTA_PORT 3232
 
 // Firmware version for OTA updates
-#define FIRMWARE_VERSION "1.0.3"
+#define FIRMWARE_VERSION "v1.0.0"
 #define FIRMWARE_NAME "ESP32-GarageDoor"
 
 // OTA Update URLs (GitHub releases API)
