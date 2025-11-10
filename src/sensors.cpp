@@ -37,6 +37,23 @@ void initializeSensors() {
   #ifdef ENABLE_DHT22
   dht.begin();
   Serial.println("DHT22 sensor initialized");
+  Serial.printf("DHT22 using pin A5 (GPIO %d)\n", DHT22_PIN);
+  
+  // Test initial read after a delay
+  delay(2000);  // DHT22 needs time to stabilize
+  float testTemp = dht.readTemperature();
+  float testHum = dht.readHumidity();
+  
+  if (isnan(testTemp) || isnan(testHum)) {
+    Serial.println("⚠️  DHT22 initial test read FAILED!");
+    Serial.println("   Check connections:");
+    Serial.printf("   - Data pin A5 (GPIO %d) connected?\n", DHT22_PIN);
+    Serial.println("   - 3.3V power connected?");
+    Serial.println("   - Ground connected?");
+    Serial.println("   - 4.7kΩ pull-up resistor from data to 3.3V?");
+  } else {
+    Serial.printf("✅ DHT22 initial test: %.1f°C, %.1f%% humidity\n", testTemp, testHum);
+  }
   #endif
   
   #ifdef ENABLE_BMP280
@@ -100,19 +117,30 @@ void readAllSensors() {
 
 #ifdef ENABLE_DHT22
 void readDHT22() {
+  Serial.printf("Reading DHT22 from pin A5 (GPIO %d)...\n", DHT22_PIN);
+  
   float humidity = dht.readHumidity();
   float temperature = dht.readTemperature();
   
+  Serial.printf("Raw DHT22 readings: Temp=%.2f, Humidity=%.2f\n", temperature, humidity);
+  
   if (isnan(humidity) || isnan(temperature)) {
-    Serial.println("Failed to read from DHT22 sensor!");
+    Serial.println("❌ Failed to read from DHT22 sensor!");
+    Serial.println("   Possible issues:");
+    Serial.println("   - Missing 4.7kΩ pull-up resistor on data line");
+    Serial.println("   - Loose connections");
+    Serial.println("   - Sensor defective");
+    Serial.printf("   - Check GPIO %d is correct for A5 on your board\n", DHT22_PIN);
+    currentSensorData.dataValid = false;
     return;
   }
   
   currentSensorData.temperature = temperature;
   currentSensorData.humidity = humidity;
+  currentSensorData.dataValid = true;
   
   if (DEBUG_SENSORS) {
-    Serial.printf("DHT22 - Temperature: %.2f°C, Humidity: %.2f%%\n", 
+    Serial.printf("✅ DHT22 - Temperature: %.2f°C, Humidity: %.2f%%\n", 
                   temperature, humidity);
   }
 }

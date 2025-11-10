@@ -22,16 +22,16 @@
 #define SENSOR_READ_INTERVAL 2000  // Read sensors every 2 seconds
 
 // GPIO Pin Definitions for ESP32 S3 Nano
-#define E3JK_RR11_PIN 4           // E3JK-RR11 photoelectric sensor digital output
-#define DHT22_PIN 5               // Optional temperature/humidity sensor
+#define E3JK_RR11_PIN 4            // E3JK-RR11 photoelectric sensor digital output - GPIO 4
+#define DHT22_PIN 5                // DHT22 temperature/humidity sensor - using GPIO 5 instead of A5
 #define BMP280_SDA_PIN 8          // Optional pressure sensor I2C
 #define BMP280_SCL_PIN 9          // Optional pressure sensor I2C
 #define ANALOG_SENSOR_PIN A0      // Optional analog input
-#define LED_INDICATOR_PIN 2       // Status LED for sensor detection
+#define LED_INDICATOR_PIN 2       // Status LED for sensor detection - GPIO 2 (built-in LED)
 
 // Sensor Enable/Disable flags
 #define ENABLE_E3JK_RR11          // Primary photoelectric sensor
-// #define ENABLE_DHT22           // Uncomment for environmental monitoring
+#define ENABLE_DHT22              // Temperature/humidity monitoring enabled
 // #define ENABLE_BMP280          // Uncomment for pressure monitoring
 // #define ENABLE_ANALOG_SENSOR   // Uncomment for additional analog input
 

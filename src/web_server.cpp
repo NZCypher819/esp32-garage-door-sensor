@@ -39,6 +39,13 @@ void initWebServer() {
         server.send(200, "application/json", getOTAStatusJSON());
     });
 
+    server.on("/api/ota/check", HTTP_POST, []() {
+        Serial.println("=== MANUAL OTA CHECK REQUEST ===");
+        otaManager.triggerUpdateCheck();
+        delay(100); // Give it a moment to start checking
+        server.send(200, "application/json", "{\"status\":\"checking\",\"message\":\"Update check triggered\"}");
+    });
+
     server.on("/api/ota/install", HTTP_POST, []() {
         Serial.println("=== OTA INSTALL REQUEST RECEIVED ===");
         
@@ -106,6 +113,21 @@ String getStatusJSON() {
     doc["sensors"]["led"]["status"] = digitalRead(LED_INDICATOR_PIN) ? "ON" : "OFF";
     doc["sensors"]["led"]["pin"] = LED_INDICATOR_PIN;
     
+    // DHT22 environmental data
+    #ifdef ENABLE_DHT22
+    if (currentSensorData.dataValid) {
+        doc["sensors"]["temperature"]["value"] = currentSensorData.temperature;
+        doc["sensors"]["temperature"]["unit"] = "°C";
+        doc["sensors"]["humidity"]["value"] = currentSensorData.humidity;
+        doc["sensors"]["humidity"]["unit"] = "%";
+    } else {
+        doc["sensors"]["temperature"]["value"] = "N/A";
+        doc["sensors"]["temperature"]["unit"] = "°C";
+        doc["sensors"]["humidity"]["value"] = "N/A";
+        doc["sensors"]["humidity"]["unit"] = "%";
+    }
+    #endif
+    
     String jsonString;
     serializeJson(doc, jsonString);
     return jsonString;
@@ -115,6 +137,7 @@ String getOTAStatusJSON() {
     JsonDocument doc;
     
     doc["current_version"] = FIRMWARE_VERSION;
+    doc["latest_version"] = otaManager.getLatestVersion();
     doc["update_available"] = otaManager.isUpdateAvailable();
     doc["last_check"] = "now";
     
@@ -131,7 +154,31 @@ String getMainPageHTML() {
     String ledClass = digitalRead(LED_INDICATOR_PIN) ? "on" : "";
     String uptime = String(millis() / 1000) + "s";
     String memory = String(ESP.getFreeHeap() / 1024) + " KB";
-    String version = String(FIRMWARE_VERSION);
+    // Get latest version info for display
+    #ifdef ENABLE_WIFI
+    String latestVersion = otaManager.getLatestVersion();
+    bool updateAvailable = otaManager.isUpdateAvailable();
+    String updateStatus = updateAvailable ? "Update available!" : "Up to date";
+    String updateClass = updateAvailable ? "update-available" : "update-current";
+    #else
+    String latestVersion = "Unknown";
+    bool updateAvailable = false;
+    String updateStatus = "WiFi disabled";
+    String updateClass = "";
+    #endif
+    
+    // DHT22 sensor data
+    #ifdef ENABLE_DHT22
+    String temperature = currentSensorData.dataValid ? String(currentSensorData.temperature, 1) + "°C" : "N/A";
+    String humidity = currentSensorData.dataValid ? String(currentSensorData.humidity, 1) + "%" : "N/A";
+    String tempClass = currentSensorData.dataValid ? "temp-normal" : "";
+    String humidityClass = currentSensorData.dataValid ? "humidity-normal" : "";
+    #else
+    String temperature = "Disabled";
+    String humidity = "Disabled";
+    String tempClass = "";
+    String humidityClass = "";
+    #endif
     
     return R"(<!DOCTYPE html>
 <html>
@@ -148,6 +195,10 @@ String getMainPageHTML() {
         .status-card.blocked { border-left-color: #dc3545; background: #f8d7da; }
         .status-card.clear { border-left-color: #28a745; background: #d4edda; }
         .status-card.on { border-left-color: #ffc107; background: #fff3cd; }
+        .status-card.temp-normal { border-left-color: #17a2b8; background: #d1ecf1; }
+        .status-card.humidity-normal { border-left-color: #6f42c1; background: #e2d9f3; }
+        .update-available { color: #856404; background: #fff3cd; padding: 5px 10px; border-radius: 4px; font-weight: bold; }
+        .update-current { color: #155724; background: #d4edda; padding: 5px 10px; border-radius: 4px; font-weight: bold; }
         .status-value { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
         .status-label { color: #666; font-size: 14px; }
         .button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-size: 16px; margin: 5px; text-decoration: none; display: inline-block; }
@@ -169,6 +220,14 @@ String getMainPageHTML() {
                 <div class="status-value">)" + ledStatus + R"(</div>
                 <div class="status-label">Status LED</div>
             </div>
+            <div class="status-card )" + tempClass + R"(">
+                <div class="status-value">)" + temperature + R"(</div>
+                <div class="status-label">Temperature</div>
+            </div>
+            <div class="status-card )" + humidityClass + R"(">
+                <div class="status-value">)" + humidity + R"(</div>
+                <div class="status-label">Humidity</div>
+            </div>
             <div class="status-card">
                 <div class="status-value">)" + uptime + R"(</div>
                 <div class="status-label">Uptime</div>
@@ -180,7 +239,8 @@ String getMainPageHTML() {
         </div>
         <div class="update-section">
             <h3>Firmware Updates</h3>
-            <p>Current Version: )" + version + R"(</p>
+            <p>Current Version: )" + String(FIRMWARE_VERSION) + R"(</p>
+            <p>Latest Available: )" + latestVersion + R"( <span class=")" + updateClass + R"(">)" + updateStatus + R"(</span></p>
             <div style="margin: 20px 0; padding: 20px; background: #e8f5e8; border-radius: 8px; border: 2px solid #28a745;">
                 <h4 style="margin: 0 0 10px 0; color: #155724;">🚀 Install Latest Update</h4>
                 <p style="margin: 0 0 15px 0; color: #155724;">Click the button below to install the latest firmware version.</p>
@@ -192,6 +252,11 @@ String getMainPageHTML() {
                 <p style="margin-top: 10px; font-size: 12px; color: #666;">Device will restart automatically after update</p>
             </div>
             <p><a href="/refresh" class="button">🔄 Refresh Status</a></p>
+            <p>
+                <form method="POST" action="/api/ota/check" style="display: inline; margin: 5px;">
+                    <button type="submit" class="button" style="background: #17a2b8;">🔍 Check for Updates</button>
+                </form>
+            </p>
             <p><a href="/api/status" class="button">📊 View Status JSON</a></p>
             <p><a href="/api/ota/status" class="button">🔍 Check Updates JSON</a></p>
             <div class="refresh-note">Click "Refresh Status" to update sensor readings</div>
