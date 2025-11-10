@@ -173,14 +173,14 @@ bool OTAManager::checkForUpdate() {
                 Serial.print("***  ");
                 Serial.print(currentVersion);
                 Serial.print(" -> ");
-                Serial.print(latestVersion);
+                Serial.print(compareVersion);
                 Serial.println("  ***");
                 Serial.println("****************************************");
                 Serial.flush();
                 delay(200);
                 
                 // Critical update notification using ESP32 logging
-                log_w("UPDATE AVAILABLE: %s -> %s", currentVersion.c_str(), latestVersion.c_str());
+                log_w("UPDATE AVAILABLE: %s -> %s", currentVersion.c_str(), compareVersion.c_str());
                 
                 // Look for firmware asset
                 JsonArray assets = doc["assets"];
