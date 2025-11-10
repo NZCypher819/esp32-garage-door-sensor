@@ -19,7 +19,7 @@
 #define SIMULATION_BEAM_INTERVAL 10000  // Simulate beam break every 10 seconds
 
 // Sensor Configuration
-#define SENSOR_READ_INTERVAL 2000  // Read sensors every 2 seconds
+#define SENSOR_READ_INTERVAL 200  // Read sensors every 200ms for faster LED response
 
 // GPIO Pin Definitions for ESP32 S3 Nano
 #define E3JK_RR11_PIN 4            // E3JK-RR11 photoelectric sensor digital output - GPIO 4
